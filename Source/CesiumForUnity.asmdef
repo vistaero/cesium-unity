@@ -10,6 +10,7 @@
         "Android",
         "Editor",
         "iOS",
+        "tvOS",
         "LinuxStandalone64",
         "macOSStandalone",
         "WSA",

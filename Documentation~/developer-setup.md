@@ -147,6 +147,21 @@ dotnet run --project Build~
 
 On success, the built .tar.gz package is found in the root directory of the project (e.g. `c:\cesium\CesiumForUnityBuildProject`).
 
+### Packaging for tvOS
+
+Build tvOS packages on macOS with Xcode (including the tvOS SDK), Unity's **tvOS Build Support** module, CMake, and the .NET SDK specified in `global.json`. Place the repository under a Unity project's `Packages` directory as described above, then run from the package directory:
+
+```sh
+dotnet publish Reinterop~ -o .
+dotnet run --project Build~ package --platform tvOS --unity-executable "/Applications/Unity/Hub/Editor/2022.3.41f1/Unity.app/Contents/MacOS/Unity"
+```
+
+This builds for Apple TV devices (ARM64), with a native deployment target of tvOS 12.0. Simulator binaries are not included. Source builds also require the **Device SDK** in tvOS Player Settings. The package build selects this SDK automatically, exports a temporary Unity Xcode project, and builds it with code signing disabled to check the final link.
+
+tvOS has its own `native~/build-tvOS`, `native~/generated-tvOS`, and `Plugins/tvOS` directories. Its static native library and dependencies use the `arm64-tvos-unity` vcpkg triplet and the `appletvos` SDK; iOS binaries are not reused. The bindings generated for the package are guarded by `UNITY_TVOS`. Blend2D is built without JIT, as on iOS.
+
+Add `--platform Editor` to include the macOS Editor binaries, and `--platform iOS` to include iOS binaries in the same `.tgz`. The macOS CI job includes all three Apple player platforms and the Editor; its artifact is also included in the combined package.
+
 ## Running Tests
 
 In the Unity Editor, go to Window -> General -> Test Runner. Switch to the "Play Mode" tests and click "Run All".

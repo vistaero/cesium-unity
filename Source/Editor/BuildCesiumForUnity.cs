@@ -109,6 +109,42 @@ namespace CesiumForUnity
             EditorApplication.Exit(0);
         }
 
+        public static void CompileForTVOSAndExit()
+        {
+            // Finish exporting the Xcode project so we can also validate its final link.
+            CompileCesiumForUnityNative.ExitAfterCompile = false;
+
+            string buildPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(buildPath);
+            try
+            {
+                PlayerSettings.SetScriptingBackend(BuildTargetGroup.tvOS, ScriptingImplementation.IL2CPP);
+                PlayerSettings.tvOS.sdkVersion = tvOSSdkVersion.Device;
+                string outputPath = Path.Combine(buildPath, "tvOS");
+                BuildPlayer(BuildTargetGroup.tvOS, BuildTarget.tvOS, outputPath, false);
+
+                string projectDirectory = Path.Combine(outputPath, "game");
+                string xcodeProject = Directory.GetDirectories(projectDirectory, "*.xcodeproj").Single();
+                var startInfo = new System.Diagnostics.ProcessStartInfo("xcodebuild")
+                {
+                    Arguments = $"-project \"{xcodeProject}\" -sdk appletvos -configuration Release CODE_SIGNING_ALLOWED=NO",
+                    WorkingDirectory = projectDirectory,
+                    UseShellExecute = false
+                };
+                using (System.Diagnostics.Process process = System.Diagnostics.Process.Start(startInfo))
+                {
+                    process.WaitForExit();
+                    if (process.ExitCode != 0)
+                        throw new Exception($"xcodebuild for tvOS failed with exit code {process.ExitCode}.");
+                }
+            }
+            finally
+            {
+                Directory.Delete(buildPath, true);
+            }
+            EditorApplication.Exit(0);
+        }
+
         public static void CompileForWindowsAndExit()
         {
             CompileCesiumForUnityNative.ExitAfterCompile = true;

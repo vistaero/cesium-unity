@@ -239,6 +239,9 @@ jobs:
       - name: Install Unity iOS Support 
         run: |
           /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- --headless install-modules --version 2022.3.41f1 --changeset 0f988161febf --module ios --architecture arm64
+      - name: Install Unity tvOS Support
+        run: |
+          /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- --headless install-modules --version 2022.3.41f1 --changeset 0f988161febf --module appletv --architecture arm64
       - name: Configure Unity to Use the License Server
         run: |
           sudo mkdir -p "/Library/Application Support/Unity/config"
@@ -308,7 +311,7 @@ jobs:
           # We only need a release build of vcpkg dependencies
           export CESIUM_VCPKG_RELEASE_ONLY="TRUE"
           cd ~/cesium/CesiumForUnityBuildProject/Packages/com.cesium.unity
-          dotnet run --project Build~ package --platform Editor --platform macOS --platform iOS
+          dotnet run --project Build~ package --platform Editor --platform macOS --platform iOS --platform tvOS
           ls -l ~/cesium/CesiumForUnityBuildProject
       - name: Publish Logs
         if: success() || failure()    # run this step even if previous step failed

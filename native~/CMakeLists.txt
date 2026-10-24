@@ -23,6 +23,11 @@ option(CESIUM_TRACING_ENABLED "Whether to enable the Cesium performance tracing 
 option(EDITOR "Whether to build with Editor support." ON)
 set(REINTEROP_GENERATED_DIRECTORY "generated-Editor" CACHE STRING "The subdirectory of each native library in which the Reinterop-generated code is found.")
 
+set(CESIUM_TARGET_APPLE_MOBILE OFF)
+if (CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+  set(CESIUM_TARGET_APPLE_MOBILE ON)
+endif()
+
 if (CESIUM_TRACING_ENABLED)
     add_compile_definitions(CESIUM_TRACING_ENABLED=1)
 endif()
@@ -113,6 +118,8 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/extern/cesium-native/cmake/detect-vcpkg-trip
 if (NOT VCPKG_TRIPLET)
     if (DEFINED ENV{VCPKG_TRIPLET})
         set(VCPKG_TRIPLET "$ENV{VCPKG_TRIPLET}")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+        set(VCPKG_TRIPLET arm64-tvos-unity)
     elseif(DETECTED_VCPKG_TRIPLET_ERROR)
         message(FATAL_ERROR "${DETECTED_VCPKG_TRIPLET_ERROR}")
     elseif(CESIUM_WASM64 AND "${DETECTED_VCPKG_TRIPLET}" STREQUAL "wasm32-emscripten")
@@ -122,11 +129,17 @@ if (NOT VCPKG_TRIPLET)
     endif()
 endif()
 
+# cesium-native's triplet detector predates tvOS. Keep dependency resolution on
+# the tvOS triplet even when vcpkg loads its own toolchain later in configuration.
+if (CMAKE_SYSTEM_NAME STREQUAL "tvOS" AND NOT VCPKG_TARGET_TRIPLET)
+  set(VCPKG_TARGET_TRIPLET "${VCPKG_TRIPLET}")
+endif()
+
 # We never need any of cesium-native's header files to be installed.
 set(CESIUM_INSTALL_HEADERS OFF)
 
-# We only need cesium-native's static lib files to be installed on iOS and Wasm.
-if (NOT IOS AND NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Emscripten")
+# We only need cesium-native's static lib files on Apple mobile platforms and Wasm.
+if (NOT CESIUM_TARGET_APPLE_MOBILE AND NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Emscripten")
     set(CESIUM_INSTALL_STATIC_LIBS OFF)
 endif()
 
@@ -142,7 +155,18 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Emscripten")
   set(CESIUM_DISABLE_LIBJPEG_TURBO ON)
 endif()
 
-add_subdirectory(extern/cesium-native)
+if (CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+  function(add_cesium_native_for_tvos)
+    # This cesium-native revision uses IOS to disable Blend2D's JIT and asmjit.
+    # Scope the compatibility flag to the dependency; its actual compiler target,
+    # SDK, and vcpkg triplet remain tvOS.
+    set(IOS ON)
+    add_subdirectory(extern/cesium-native)
+  endfunction()
+  add_cesium_native_for_tvos()
+else()
+  add_subdirectory(extern/cesium-native)
+endif()
 
 # Don't build the cesium-native tests by default.
 set_target_properties(cesium-native-tests PROPERTIES EXCLUDE_FROM_ALL 1 EXCLUDE_FROM_DEFAULT_BUILD 1)
@@ -159,7 +183,7 @@ endif()
 file(GLOB_RECURSE CESIUMFORUNITYNATIVE_SOURCES CONFIGURE_DEPENDS src/Runtime/*.cpp ${REINTEROP_GENERATED_DIRECTORY}/src/*.cpp)
 file(GLOB_RECURSE CESIUMFORUNITYNATIVE_HEADERS CONFIGURE_DEPENDS src/Runtime/*.h ${REINTEROP_GENERATED_DIRECTORY}/src/*.h)
 
-if (${CMAKE_SYSTEM_NAME} STREQUAL "iOS" OR CESIUM_TARGET_WASM)
+if (CESIUM_TARGET_APPLE_MOBILE OR CESIUM_TARGET_WASM)
     add_library(CesiumForUnityNative STATIC)
 else()
     add_library(CesiumForUnityNative SHARED)
@@ -265,8 +289,8 @@ endif()
 
 set(LIB_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
 
-# Specify all targets that need to compile bitcode
-if (${CMAKE_SYSTEM_NAME} STREQUAL "iOS" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Emscripten")
+# Install tidy alongside the other dependencies required for static linking.
+if (CESIUM_TARGET_APPLE_MOBILE OR ${CMAKE_SYSTEM_NAME} STREQUAL "Emscripten")
   install(TARGETS tidy-static)
   set_target_properties(tidy-static PROPERTIES EXCLUDE_FROM_ALL 0 EXCLUDE_FROM_DEFAULT_BUILD 0)
 endif()
